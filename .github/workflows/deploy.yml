@@ -86,5 +86,6 @@ jobs:
               --restart unless-stopped \
               --memory 128m \
               --memory-swap 128m \
+              -e CORS_ALLOWED_ORIGIN=https://db0nnsq3215hs.cloudfront.net \
               -p 8080:8080 \
               eduardorcury/investimentos-backend:latest

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -12,6 +13,7 @@ import (
 	"github.com/duducury/investimentos-backend/internal/auth"
 	"github.com/duducury/investimentos-backend/internal/dynamo"
 	"github.com/duducury/investimentos-backend/internal/handler"
+	"github.com/duducury/investimentos-backend/internal/middleware"
 )
 
 func main() {
@@ -43,9 +45,16 @@ func main() {
 	protected.HandleFunc("POST /transactions/upload", transactionHandler.UploadNota)
 	mux.Handle("/", authService.Middleware(protected))
 
+	// CORS wraps everything: the frontend (served from CloudFront) calls this
+	// API cross-origin, so preflight OPTIONS must be answered before routing.
+	allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "*"
+	}
+
 	srv := &http.Server{
 		Addr:         ":8080",
-		Handler:      mux,
+		Handler:      middleware.CORS(allowedOrigin, mux),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
