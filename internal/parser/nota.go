@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"os"
 	"regexp"
 	"sort"
@@ -401,30 +402,45 @@ func parseTransactions(text string) ([]dynamo.Transaction, error) {
 		}
 	}
 
-	// Parse aggregated summary lines
-	var transactions []dynamo.Transaction
-	seen := map[string]bool{}
+	// Aggregate summary lines per ticker. The integral (e.g. CPLE6) and
+	// fractional (CPLE6F) markets are the same security and show up as separate
+	// "Quantidade Total / Preço Médio" lines; sum their quantities and take the
+	// quantity-weighted average price so the fractional part is not lost.
+	type agg struct {
+		qty  int
+		cost float64
+	}
+	aggByTicker := map[string]*agg{}
+	var order []string
 	for _, m := range totalRe.FindAllStringSubmatch(text, -1) {
 		ticker := m[1]
-		if seen[ticker] {
-			continue
-		}
-		seen[ticker] = true
-
 		qty, _ := strconv.Atoi(m[2])
-		priceStr := strings.ReplaceAll(m[3], ",", ".")
-		price, _ := strconv.ParseFloat(priceStr, 64)
+		price, _ := strconv.ParseFloat(strings.ReplaceAll(m[3], ",", "."), 64)
 
+		a, ok := aggByTicker[ticker]
+		if !ok {
+			a = &agg{}
+			aggByTicker[ticker] = a
+			order = append(order, ticker)
+		}
+		a.qty += qty
+		a.cost += float64(qty) * price
+	}
+
+	var transactions []dynamo.Transaction
+	for _, ticker := range order {
+		a := aggByTicker[ticker]
 		txType := cvByTicker[ticker]
 		if txType == "" {
 			txType = "C"
 		}
 
+		avgPrice := math.Round(a.cost/float64(a.qty)*10000) / 10000
 		transactions = append(transactions, dynamo.Transaction{
 			Ticker:     ticker,
 			Date:       date,
-			Quantity:   qty,
-			Value:      price,
+			Quantity:   a.qty,
+			Value:      avgPrice,
 			Type:       txType,
 			NotaNumber: notaNumber,
 		})
