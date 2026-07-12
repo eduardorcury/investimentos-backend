@@ -36,9 +36,11 @@ jobs:
           echo "ec2_user=$(aws ssm get-parameters --region $AWS_REGION \
             --name ec2_user --with-decryption \
             --query "Parameters[0].Value" --output text)" >> $GITHUB_OUTPUT
-          echo "ec2_ssh_key=$(aws ssm get-parameters --region $AWS_REGION \
+          echo "ec2_ssh_key<<EOF" >> $GITHUB_OUTPUT
+          aws ssm get-parameters --region $AWS_REGION \
             --name ec2_ssh_key --with-decryption \
-            --query "Parameters[0].Value" --output text)" >> $GITHUB_OUTPUT
+            --query "Parameters[0].Value" --output text >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
