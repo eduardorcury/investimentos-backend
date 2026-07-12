@@ -1,1 +1,6 @@
 .idea
+
+*.pdf
+
+# Metadados do Windows/WSL
+*:Zone.Identifier

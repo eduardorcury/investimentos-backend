@@ -368,8 +368,8 @@ func extractText(pdfPath string) (string, error) {
 var (
 	dateRe  = regexp.MustCompile(`Data de Referência:\s+(\d{2}/\d{2}/\d{4})`)
 	notaRe  = regexp.MustCompile(`Nº Nota\s+\d{2}/\d{2}/\d{4}\s+(\d+)`)
-	boldRe  = regexp.MustCompile(`\d+-BOVESPA\s+(C|V)\s+\S+\s+[^\n]*?([A-Z]{4}[0-9]{1,2})F?\s+@`)
-	totalRe = regexp.MustCompile(`([A-Z]{4}[0-9]{1,2})F?[^\n]*?Quantidade Total:\s+(\d+)\s+Preço Médio:\s+([\d,]+)`)
+	boldRe  = regexp.MustCompile(`\d+-BOVESPA\s+(C|V)\s+\S+\s+[^\n]*?([A-Z][A-Z0-9]{3}[0-9]{1,2})F?\b`)
+	totalRe = regexp.MustCompile(`([A-Z][A-Z0-9]{3}[0-9]{1,2})F?[^\n]*?Quantidade Total:\s+(\d+)\s+Preço Médio:\s+([\d,]+)`)
 )
 
 var brt = time.FixedZone("BRT", -3*3600)
