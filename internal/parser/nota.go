@@ -355,7 +355,7 @@ func extractText(pdfPath string) (string, error) {
 	var sb strings.Builder
 	entries, _ := os.ReadDir(tmpDir)
 	for _, e := range entries {
-		raw, _ := os.ReadFile(tmpDir+"/"+e.Name())
+		raw, _ := os.ReadFile(tmpDir + "/" + e.Name())
 		glyphs := extractGlyphs(string(raw), fontCMaps)
 		slog.Info("page processed", "page", e.Name(), "glyphs", len(glyphs))
 		sb.WriteString(reconstructText(glyphs))
@@ -421,12 +421,12 @@ func parseTransactions(text string) ([]dynamo.Transaction, error) {
 		}
 
 		transactions = append(transactions, dynamo.Transaction{
-			Ticker:      ticker,
-			Date:        date,
-			Quantity:    qty,
-			Value:       price,
-			Type:        txType,
-			NotaNumber:  notaNumber,
+			Ticker:     ticker,
+			Date:       date,
+			Quantity:   qty,
+			Value:      price,
+			Type:       txType,
+			NotaNumber: notaNumber,
 		})
 	}
 
