@@ -12,7 +12,7 @@ import (
 	"github.com/duducury/investimentos-backend/internal/model"
 )
 
-var tickerRe = regexp.MustCompile(`^[A-Z][A-Z0-9]{3}[0-9]{1,2}B?$`)
+var tickerRe = regexp.MustCompile(`^(?:[A-Z]{4}|[A-Z][0-9][A-Z]{2})[0-9]{1,2}B?$`)
 
 func StockHistory(w http.ResponseWriter, r *http.Request) {
 	ticker := r.PathValue("ticker")

@@ -11,6 +11,7 @@ type position struct {
 	Quantity  int     `json:"quantity"`
 	AvgPrice  float64 `json:"avgPrice"`
 	TotalCost float64 `json:"totalCost"`
+	AssetType string  `json:"assetType"`
 }
 
 func (h *TransactionsHandler) GetPortfolio(w http.ResponseWriter, r *http.Request) {
@@ -25,8 +26,9 @@ func (h *TransactionsHandler) GetPortfolio(w http.ResponseWriter, r *http.Reques
 
 	// Group by ticker: accumulate cost and quantity separately for buys and sells
 	type bucket struct {
-		qty  int
-		cost float64
+		qty       int
+		cost      float64
+		assetType string
 	}
 	byTicker := map[string]*bucket{}
 
@@ -35,6 +37,9 @@ func (h *TransactionsHandler) GetPortfolio(w http.ResponseWriter, r *http.Reques
 		if !ok {
 			b = &bucket{}
 			byTicker[tx.Ticker] = b
+		}
+		if tx.AssetType != "" {
+			b.assetType = tx.AssetType
 		}
 		if tx.Type == "C" {
 			b.qty += tx.Quantity
@@ -56,6 +61,7 @@ func (h *TransactionsHandler) GetPortfolio(w http.ResponseWriter, r *http.Reques
 			Quantity:  b.qty,
 			AvgPrice:  math.Round(avgPrice*10000) / 10000,
 			TotalCost: math.Round(b.cost*100) / 100,
+			AssetType: b.assetType,
 		})
 	}
 

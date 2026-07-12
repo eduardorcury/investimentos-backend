@@ -14,6 +14,13 @@ func (t *Transaction) FillID() {
 	t.ID = fmt.Sprintf("%x", h)[:16]
 }
 
+// Asset classes stored in AssetType.
+const (
+	AssetAcao = "acao"
+	AssetFII  = "fii"
+	AssetETF  = "etf"
+)
+
 type Transaction struct {
 	ID         string    `dynamodbav:"id"          json:"id"`
 	Ticker     string    `dynamodbav:"ticker"      json:"ticker"`
@@ -22,4 +29,5 @@ type Transaction struct {
 	Value      float64   `dynamodbav:"value"       json:"value"`
 	Type       string    `dynamodbav:"type"        json:"type"`
 	NotaNumber string    `dynamodbav:"notaNumber"  json:"notaNumber"`
+	AssetType  string    `dynamodbav:"assetType"   json:"assetType"`
 }

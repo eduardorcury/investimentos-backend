@@ -366,11 +366,20 @@ func extractText(pdfPath string) (string, error) {
 
 // ---- Transaction parsing ----
 
+// tickerPat matches B3 tickers: a 4-char root followed by 1-2 digits. The root
+// is either 4 letters (PETR4, IVVB11) or the special letter-digit-letter-letter
+// form (B3SA3). This deliberately excludes name noise like "SP500" (iShares
+// S&P 500), whose "SP50" root has two digits.
+const tickerPat = `(?:[A-Z]{4}|[A-Z][0-9][A-Z]{2})[0-9]{1,2}`
+
 var (
 	dateRe  = regexp.MustCompile(`Data de Referência:\s+(\d{2}/\d{2}/\d{4})`)
 	notaRe  = regexp.MustCompile(`Nº Nota\s+\d{2}/\d{2}/\d{4}\s+(\d+)`)
-	boldRe  = regexp.MustCompile(`\d+-BOVESPA\s+(C|V)\s+\S+\s+[^\n]*?([A-Z][A-Z0-9]{3}[0-9]{1,2})F?\b`)
-	totalRe = regexp.MustCompile(`([A-Z][A-Z0-9]{3}[0-9]{1,2})F?[^\n]*?Quantidade Total:\s+(\d+)\s+Preço Médio:\s+([\d,]+)`)
+	boldRe  = regexp.MustCompile(`\d+-BOVESPA\s+(C|V)\s+\S+\s+[^\n]*?(` + tickerPat + `)F?\b`)
+	fiiRe   = regexp.MustCompile(`FII\b[^\n]*?(` + tickerPat + `)F?\b`)
+	// Group 2 captures the governance suffix (e.g. " ON NM", " CI ER", " UNT N2")
+	// used to classify the asset type.
+	totalRe = regexp.MustCompile(`(` + tickerPat + `)F?([^\n]*?)Quantidade Total:\s+(\d+)\s+Preço Médio:\s+([\d,]+)`)
 )
 
 var brt = time.FixedZone("BRT", -3*3600)
@@ -402,24 +411,32 @@ func parseTransactions(text string) ([]dynamo.Transaction, error) {
 		}
 	}
 
+	// Tickers that appear on a "FII ..." specification line are real estate funds.
+	fiiTickers := map[string]bool{}
+	for _, m := range fiiRe.FindAllStringSubmatch(text, -1) {
+		fiiTickers[m[1]] = true
+	}
+
 	// Aggregate summary lines per ticker. The integral (e.g. CPLE6) and
 	// fractional (CPLE6F) markets are the same security and show up as separate
 	// "Quantidade Total / Preço Médio" lines; sum their quantities and take the
 	// quantity-weighted average price so the fractional part is not lost.
 	type agg struct {
-		qty  int
-		cost float64
+		qty       int
+		cost      float64
+		assetType string
 	}
 	aggByTicker := map[string]*agg{}
 	var order []string
 	for _, m := range totalRe.FindAllStringSubmatch(text, -1) {
 		ticker := m[1]
-		qty, _ := strconv.Atoi(m[2])
-		price, _ := strconv.ParseFloat(strings.ReplaceAll(m[3], ",", "."), 64)
+		suffix := m[2]
+		qty, _ := strconv.Atoi(m[3])
+		price, _ := strconv.ParseFloat(strings.ReplaceAll(m[4], ",", "."), 64)
 
 		a, ok := aggByTicker[ticker]
 		if !ok {
-			a = &agg{}
+			a = &agg{assetType: classifyAsset(suffix, fiiTickers[ticker])}
 			aggByTicker[ticker] = a
 			order = append(order, ticker)
 		}
@@ -443,6 +460,7 @@ func parseTransactions(text string) ([]dynamo.Transaction, error) {
 			Value:      avgPrice,
 			Type:       txType,
 			NotaNumber: notaNumber,
+			AssetType:  a.assetType,
 		})
 	}
 
@@ -450,4 +468,28 @@ func parseTransactions(text string) ([]dynamo.Transaction, error) {
 		return nil, fmt.Errorf("no transactions found in nota")
 	}
 	return transactions, nil
+}
+
+// classifyAsset infers the asset class from the specification suffix that
+// follows the ticker (e.g. "ON NM", "CI ER", "UNT N2"). FIIs are detected
+// upstream via the "FII" prefix. Units and anything unrecognized fall back to
+// stock ("acao").
+func classifyAsset(suffix string, isFII bool) string {
+	if isFII {
+		return dynamo.AssetFII
+	}
+	tokens := map[string]bool{}
+	for _, t := range strings.Fields(suffix) {
+		tokens[t] = true
+	}
+	switch {
+	case tokens["ON"] || tokens["PN"] || tokens["PNA"] || tokens["PNB"] || tokens["PNC"]:
+		return dynamo.AssetAcao
+	case tokens["UNT"]:
+		return dynamo.AssetAcao // Unit tratado como ação
+	case tokens["CI"]:
+		return dynamo.AssetETF
+	default:
+		return dynamo.AssetAcao
+	}
 }
