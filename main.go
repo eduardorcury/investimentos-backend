@@ -17,7 +17,11 @@ import (
 )
 
 func main() {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	region := os.Getenv("AWS_REGION")
+	if region == "" {
+		region = "sa-east-1"
+	}
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
 	if err != nil {
 		log.Fatalf("unable to load SDK config, %v", err)
 	}
